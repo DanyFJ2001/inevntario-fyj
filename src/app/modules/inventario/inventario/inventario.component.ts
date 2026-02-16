@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
-import { Producto } from '../../../models/producto.model';
+import { Producto } from '../../../core/models/producto.model';
 import { InventarioService } from '../../../core/services/inventario.service';
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { AlertasService } from '../../../core/services/alertas.service';
@@ -37,7 +37,17 @@ export class InventarioComponent implements OnInit, OnDestroy {
   
   // Formulario
   formularioProducto!: FormGroup;
-  categorias = ['Bebidas', 'Snacks', 'Lácteos', 'Panadería', 'Limpieza', 'Otros'];
+  categorias = [
+    'Aceites',
+    'Filtros',
+    'Bujías',
+    'Frenos',
+    'Refrigerantes',
+    'Transmisión',
+    'Limpieza',
+    'Aditivos',
+    'Otros'
+  ];
 
   // Búsqueda y filtros
   terminoBusqueda = '';
@@ -113,6 +123,9 @@ export class InventarioComponent implements OnInit, OnDestroy {
    */
   procesarCodigoEscaneado(codigo: string): void {
     console.log('Código escaneado:', codigo);
+    
+    // CERRAR SCANNER INMEDIATAMENTE
+    this.scannerActivo = false;
     this.cargando = true;
     
     this.inventarioService.buscarPorCodigoBarras(codigo)
@@ -123,23 +136,24 @@ export class InventarioComponent implements OnInit, OnDestroy {
             this.productoActual = producto;
             this.modoEdicion = true;
             this.cargarProductoEnFormulario(producto);
-            this.alertasService.mostrarInfo(`Producto encontrado: ${producto.nombre}`);
+            this.alertasService.mostrarInfo(`✓ Producto: ${producto.nombre}`);
           } else {
             // Producto nuevo
             this.productoActual = null;
             this.modoEdicion = false;
             this.formularioProducto.patchValue({ codigoBarras: codigo });
-            this.alertasService.mostrarInfo('Producto nuevo - Complete los datos');
+            this.alertasService.mostrarInfo('➕ Producto nuevo');
           }
           
+          // MOSTRAR FORMULARIO
           this.mostrarFormulario = true;
-          this.scannerActivo = false;
           this.cargando = false;
         },
         error: (error) => {
           console.error('Error al buscar producto:', error);
-          this.alertasService.mostrarError('Error al buscar producto');
+          this.alertasService.mostrarError('❌ Error al buscar producto');
           this.cargando = false;
+          this.scannerActivo = false;
         }
       });
   }
@@ -174,7 +188,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
    */
   guardarProducto(): void {
     if (this.formularioProducto.invalid) {
-      this.alertasService.mostrarError('Complete todos los campos requeridos');
+      this.alertasService.mostrarError('⚠️ Complete todos los campos');
       return;
     }
 
@@ -207,7 +221,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.inventarioService.agregarProducto(nuevoProducto)
       .subscribe({
         next: () => {
-          this.alertasService.mostrarExito('✅ Producto agregado exitosamente');
+          this.alertasService.mostrarExito('✅ Producto agregado');
           
           // Verificar si el stock está bajo
           if (nuevoProducto.stock < nuevoProducto.stockMinimo) {
@@ -223,7 +237,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
         },
         error: (error) => {
           console.error('Error al agregar producto:', error);
-          this.alertasService.mostrarError('Error al agregar producto');
+          this.alertasService.mostrarError('❌ Error al guardar');
           this.cargando = false;
         }
       });
@@ -238,7 +252,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
     const cantidadAgregar = Number(this.formularioProducto.get('cantidadAgregar')?.value);
     
     if (cantidadAgregar === 0) {
-      this.alertasService.mostrarAdvertencia('Ingrese una cantidad a agregar');
+      this.alertasService.mostrarAdvertencia('⚠️ Ingrese cantidad');
       this.cargando = false;
       return;
     }
@@ -251,7 +265,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: () => {
         const nuevoStock = this.productoActual!.stock + cantidadAgregar;
-        this.alertasService.mostrarExito(`✅ Stock actualizado: ${nuevoStock} unidades`);
+        this.alertasService.mostrarExito(`✅ Stock: ${nuevoStock} unidades`);
         
         // Verificar si aún está bajo después de la actualización
         if (nuevoStock < this.productoActual!.stockMinimo) {
@@ -267,7 +281,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         console.error('Error al actualizar stock:', error);
-        this.alertasService.mostrarError('Error al actualizar stock');
+        this.alertasService.mostrarError('❌ Error al actualizar');
         this.cargando = false;
       }
     });
@@ -293,11 +307,11 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.inventarioService.eliminarProducto(producto.id!)
       .subscribe({
         next: () => {
-          this.alertasService.mostrarExito('Producto eliminado');
+          this.alertasService.mostrarExito('✅ Producto eliminado');
         },
         error: (error) => {
           console.error('Error al eliminar:', error);
-          this.alertasService.mostrarError('Error al eliminar producto');
+          this.alertasService.mostrarError('❌ Error al eliminar');
         }
       });
   }

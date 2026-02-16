@@ -14,7 +14,7 @@ import {
   Timestamp
 } from '@angular/fire/firestore';
 import { Observable, from, map } from 'rxjs';
-import { Producto } from '../../models/producto.model';
+import { Producto } from '../models/producto.model';
 
 @Injectable({
   providedIn: 'root'

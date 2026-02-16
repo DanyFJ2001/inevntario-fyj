@@ -25,6 +25,7 @@ export class ScannerCameraComponent implements AfterViewInit, OnDestroy {
   private scanning = false;
   public lastScanned = '';
   private barcodeDetector: any = null;
+  private frameCount = 0;
 
   async ngAfterViewInit() {
     await this.iniciarCamera();
@@ -42,7 +43,8 @@ export class ScannerCameraComponent implements AfterViewInit, OnDestroy {
           formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93']
         });
       } else {
-        alert('Tu navegador no soporta detección de códigos de barras. Usa Chrome o Edge.');
+        console.error('BarcodeDetector no disponible');
+        alert('Tu navegador no soporta detección de códigos de barras.\n\nSoluciones:\n1. Usa Chrome en Android\n2. En Chrome Desktop: chrome://flags > "Experimental Web Platform features" > Activar');
         return;
       }
 
@@ -50,8 +52,8 @@ export class ScannerCameraComponent implements AfterViewInit, OnDestroy {
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment', // Cámara trasera en móvil
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
         }
       });
 
@@ -61,7 +63,7 @@ export class ScannerCameraComponent implements AfterViewInit, OnDestroy {
       // Esperar a que el video esté listo
       await video.play();
 
-      // Iniciar escaneo continuo
+      // Iniciar escaneo continuo RÁPIDO
       this.scanning = true;
       this.escanearContinuamente();
 
@@ -74,48 +76,54 @@ export class ScannerCameraComponent implements AfterViewInit, OnDestroy {
   private async escanearContinuamente() {
     if (!this.scanning || !this.barcodeDetector) return;
 
-    try {
-      const video = this.videoElementRef.nativeElement;
-      const canvas = this.canvasElementRef.nativeElement;
-      const context = canvas.getContext('2d')!;
+    // Solo procesar cada 3 frames para optimizar
+    this.frameCount++;
+    if (this.frameCount % 3 === 0) {
+      try {
+        const video = this.videoElementRef.nativeElement;
+        const canvas = this.canvasElementRef.nativeElement;
+        const context = canvas.getContext('2d')!;
 
-      // Ajustar tamaño del canvas al video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+        // Ajustar tamaño del canvas al video
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
 
-      // Capturar frame actual
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // Capturar frame actual
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // Detectar códigos de barras
-      const barcodes = await this.barcodeDetector.detect(canvas);
+        // Detectar códigos de barras
+        const barcodes = await this.barcodeDetector.detect(canvas);
 
-      if (barcodes.length > 0) {
-        const codigo = barcodes[0].rawValue;
-        
-        // Solo emitir si es un código nuevo
-        if (codigo && codigo !== this.lastScanned) {
-          this.lastScanned = codigo;
-          this.codigoDetectado.emit(codigo);
+        if (barcodes.length > 0) {
+          const codigo = barcodes[0].rawValue;
           
-          // Vibrar si está disponible
-          if ('vibrate' in navigator) {
-            navigator.vibrate(200);
+          // Solo emitir si es un código nuevo
+          if (codigo && codigo !== this.lastScanned) {
+            this.lastScanned = codigo;
+            
+            // Vibrar si está disponible
+            if ('vibrate' in navigator) {
+              navigator.vibrate(200);
+            }
+            
+            // Emitir código INMEDIATAMENTE
+            this.codigoDetectado.emit(codigo);
+            
+            // Detener scanner automáticamente
+            this.detenerCamera();
+            return;
           }
-          
-          // Limpiar después de 3 segundos
-          setTimeout(() => {
-            this.lastScanned = '';
-          }, 3000);
         }
-      }
 
-    } catch (error) {
-      // Continuar escaneando incluso si hay errores
+      } catch (error) {
+        // Continuar escaneando incluso si hay errores
+        console.error('Error en detección:', error);
+      }
     }
 
-    // Continuar escaneando (60 FPS aproximadamente)
+    // Continuar escaneando lo más rápido posible
     if (this.scanning) {
-      setTimeout(() => this.escanearContinuamente(), 100);
+      requestAnimationFrame(() => this.escanearContinuamente());
     }
   }
 
