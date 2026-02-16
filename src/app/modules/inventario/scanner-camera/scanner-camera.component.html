@@ -1,0 +1,19 @@
+<div class="scanner-container">
+  <!-- Video de la cámara -->
+  <video #videoElement autoplay playsinline></video>
+  
+  <!-- Canvas oculto para procesar frames -->
+  <canvas #canvasElement style="display: none;"></canvas>
+  
+  <!-- Overlay con guía visual -->
+  <div class="scanner-overlay">
+    <div class="scanner-box"></div>
+    <p class="scanner-hint">Coloca el código de barras dentro del cuadro</p>
+  </div>
+
+  <!-- Resultado del escaneo -->
+  <div class="scanner-result" *ngIf="lastScanned">
+    <span class="result-icon">✓</span>
+    <span class="result-text">{{ lastScanned }}</span>
+  </div>
+</div>

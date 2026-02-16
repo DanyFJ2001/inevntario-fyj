@@ -28,13 +28,11 @@
         <h3>Escaneando...</h3>
         <button class="btn-close" (click)="toggleScanner()">✕</button>
       </div>
-      <div class="scanner-viewport">
-        <!-- Aquí irá la implementación del scanner con ZXing -->
-        <div class="scanner-placeholder">
-          <div class="scanner-frame"></div>
-          <p class="scanner-instruction">Enfoca el código de barras</p>
-        </div>
-      </div>
+     <div class="scanner-viewport">
+  <app-scanner-camera 
+    (codigoDetectado)="procesarCodigoEscaneado($event)">
+  </app-scanner-camera>
+</div>
     </div>
   </div>
 

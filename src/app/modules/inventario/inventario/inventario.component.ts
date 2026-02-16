@@ -7,6 +7,7 @@ import { Producto } from '../../../models/producto.model';
 import { InventarioService } from '../../../core/services/inventario.service';
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { AlertasService } from '../../../core/services/alertas.service';
+import { ScannerCameraComponent } from '../scanner-camera/scanner-camera.component';
 
 @Component({
   selector: 'app-inventario',
@@ -14,7 +15,8 @@ import { AlertasService } from '../../../core/services/alertas.service';
   imports: [
     CommonModule,
     FormsModule,
-    ReactiveFormsModule
+    ReactiveFormsModule,
+    ScannerCameraComponent
   ],
   templateUrl: './inventario.component.html',
   styleUrl: './inventario.component.css'
@@ -52,13 +54,11 @@ export class InventarioComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.cargarProductos();
-    this.escucharScanner();
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    this.scannerService.detenerScanner();
   }
 
   /**
@@ -99,31 +99,12 @@ export class InventarioComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Escuchar códigos escaneados
-   */
-  private escucharScanner(): void {
-    this.scannerService.scannerActivo$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(activo => this.scannerActivo = activo);
-
-    this.scannerService.codigoEscaneado$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(codigo => {
-        if (codigo) {
-          this.procesarCodigoEscaneado(codigo);
-        }
-      });
-  }
-
-  /**
    * Activar/Desactivar scanner
    */
   toggleScanner(): void {
-    if (this.scannerActivo) {
-      this.scannerService.detenerScanner();
+    this.scannerActivo = !this.scannerActivo;
+    if (!this.scannerActivo) {
       this.cerrarFormulario();
-    } else {
-      this.scannerService.iniciarScanner();
     }
   }
 
@@ -131,6 +112,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
    * Procesar código escaneado
    */
   procesarCodigoEscaneado(codigo: string): void {
+    console.log('Código escaneado:', codigo);
     this.cargando = true;
     
     this.inventarioService.buscarPorCodigoBarras(codigo)
@@ -151,7 +133,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
           }
           
           this.mostrarFormulario = true;
-          this.scannerService.detenerScanner();
+          this.scannerActivo = false;
           this.cargando = false;
         },
         error: (error) => {
@@ -300,7 +282,6 @@ export class InventarioComponent implements OnInit, OnDestroy {
     this.productoActual = null;
     this.formularioProducto.reset();
     this.formularioProducto.enable();
-    this.scannerService.limpiarCodigo();
   }
 
   /**
