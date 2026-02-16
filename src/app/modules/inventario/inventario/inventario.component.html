@@ -1,0 +1,310 @@
+<div class="inventario-container">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <div class="title-section">
+        <h1 class="title">📦 Control de Inventario</h1>
+        <p class="subtitle">Escanea códigos de barras para verificar inventario</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Action Buttons -->
+  <div class="action-bar">
+    <button 
+      class="btn-primary" 
+      [class.active]="scannerActivo"
+      (click)="toggleScanner()">
+      <span class="btn-icon">{{ scannerActivo ? '⏹' : '📷' }}</span>
+      <span class="btn-text">{{ scannerActivo ? 'Detener Scanner' : 'Escanear Código' }}</span>
+    </button>
+  </div>
+
+  <!-- Scanner Modal -->
+  <div class="scanner-modal" *ngIf="scannerActivo">
+    <div class="scanner-overlay" (click)="toggleScanner()"></div>
+    <div class="scanner-content">
+      <div class="scanner-header">
+        <h3>Escaneando...</h3>
+        <button class="btn-close" (click)="toggleScanner()">✕</button>
+      </div>
+      <div class="scanner-viewport">
+        <!-- Aquí irá la implementación del scanner con ZXing -->
+        <div class="scanner-placeholder">
+          <div class="scanner-frame"></div>
+          <p class="scanner-instruction">Enfoca el código de barras</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Formulario Producto -->
+  <div class="form-modal" *ngIf="mostrarFormulario">
+    <div class="form-overlay" (click)="cerrarFormulario()"></div>
+    <div class="form-content">
+      <div class="form-header">
+        <h3>{{ modoEdicion ? '📝 Actualizar Stock' : '➕ Nuevo Producto' }}</h3>
+        <button class="btn-close" (click)="cerrarFormulario()">✕</button>
+      </div>
+
+      <form [formGroup]="formularioProducto" (ngSubmit)="guardarProducto()">
+        <!-- Código de Barras -->
+        <div class="form-group">
+          <label class="form-label">Código de Barras</label>
+          <input 
+            type="text" 
+            class="form-input" 
+            formControlName="codigoBarras"
+            readonly>
+        </div>
+
+        <ng-container *ngIf="!modoEdicion">
+          <!-- Nombre -->
+          <div class="form-group">
+            <label class="form-label">Nombre del Producto *</label>
+            <input 
+              type="text" 
+              class="form-input" 
+              formControlName="nombre"
+              placeholder="Ej: Coca Cola 600ml">
+          </div>
+
+          <!-- Precios -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Precio *</label>
+              <input 
+                type="number" 
+                class="form-input" 
+                formControlName="precio"
+                step="0.01"
+                placeholder="0.00">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Precio Mayoreo *</label>
+              <input 
+                type="number" 
+                class="form-input" 
+                formControlName="precioMayoreo"
+                step="0.01"
+                placeholder="0.00">
+            </div>
+          </div>
+
+          <!-- Stock -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Stock Inicial *</label>
+              <input 
+                type="number" 
+                class="form-input" 
+                formControlName="stock"
+                placeholder="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Stock Mínimo *</label>
+              <input 
+                type="number" 
+                class="form-input" 
+                formControlName="stockMinimo"
+                placeholder="0">
+            </div>
+          </div>
+
+          <!-- Categoría -->
+          <div class="form-group">
+            <label class="form-label">Categoría *</label>
+            <select class="form-input" formControlName="categoria">
+              <option value="">Seleccionar...</option>
+              <option *ngFor="let cat of categorias" [value]="cat">{{ cat }}</option>
+            </select>
+          </div>
+        </ng-container>
+
+        <!-- Modo Edición: Solo cantidad a agregar -->
+        <ng-container *ngIf="modoEdicion && productoActual">
+          <div class="info-card">
+            <div class="info-row">
+              <span class="info-label">Producto:</span>
+              <span class="info-value">{{ productoActual.nombre }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Stock actual:</span>
+              <span class="info-value">{{ productoActual.stock }} unidades</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Stock mínimo:</span>
+              <span class="info-value">{{ productoActual.stockMinimo }} unidades</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Precio:</span>
+              <span class="info-value">${{ productoActual.precio | number:'1.2-2' }}</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Cantidad a Agregar *</label>
+            <input 
+              type="number" 
+              class="form-input form-input-large" 
+              formControlName="cantidadAgregar"
+              placeholder="0"
+              autofocus>
+          </div>
+        </ng-container>
+
+        <!-- Botones -->
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" (click)="cerrarFormulario()">
+            Cancelar
+          </button>
+          <button 
+            type="submit" 
+            class="btn-primary"
+            [disabled]="cargando || formularioProducto.invalid">
+            {{ cargando ? 'Guardando...' : (modoEdicion ? 'Actualizar Stock' : 'Guardar Producto') }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">📦</div>
+      <div class="stat-content">
+        <p class="stat-value">{{ productos.length }}</p>
+        <p class="stat-label">Total Productos</p>
+      </div>
+    </div>
+
+    <div class="stat-card stat-card-success">
+      <div class="stat-icon">✅</div>
+      <div class="stat-content">
+        <p class="stat-value">{{ contarPorEstado('ok') }}</p>
+        <p class="stat-label">Stock OK</p>
+      </div>
+    </div>
+
+    <div class="stat-card stat-card-warning">
+      <div class="stat-icon">🟡</div>
+      <div class="stat-content">
+        <p class="stat-value">{{ contarPorEstado('bajo') }}</p>
+        <p class="stat-label">Stock Bajo</p>
+      </div>
+    </div>
+
+    <div class="stat-card stat-card-danger">
+      <div class="stat-icon">🔴</div>
+      <div class="stat-content">
+        <p class="stat-value">{{ contarPorEstado('critico') }}</p>
+        <p class="stat-label">Stock Crítico</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filters -->
+  <div class="search-bar">
+    <div class="search-input-wrapper">
+      <span class="search-icon">🔍</span>
+      <input 
+        type="text" 
+        class="search-input" 
+        [(ngModel)]="terminoBusqueda"
+        (ngModelChange)="aplicarFiltros()"
+        placeholder="Buscar por código, producto o categoría...">
+    </div>
+  </div>
+
+  <div class="filter-tabs">
+    <button 
+      class="filter-tab"
+      [class.active]="filtroActivo === 'todos'"
+      (click)="cambiarFiltro('todos')">
+      Todos ({{ productos.length }})
+    </button>
+    <button 
+      class="filter-tab"
+      [class.active]="filtroActivo === 'ok'"
+      (click)="cambiarFiltro('ok')">
+      ✅ OK ({{ contarPorEstado('ok') }})
+    </button>
+    <button 
+      class="filter-tab"
+      [class.active]="filtroActivo === 'bajo'"
+      (click)="cambiarFiltro('bajo')">
+      🟡 Bajo ({{ contarPorEstado('bajo') }})
+    </button>
+    <button 
+      class="filter-tab"
+      [class.active]="filtroActivo === 'critico'"
+      (click)="cambiarFiltro('critico')">
+      🔴 Crítico ({{ contarPorEstado('critico') }})
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-container" *ngIf="cargando && !mostrarFormulario">
+    <div class="spinner"></div>
+    <p>Cargando...</p>
+  </div>
+
+  <!-- Tabla Productos -->
+  <div class="table-container" *ngIf="!cargando">
+    <div class="table-info">
+      <p>{{ productosFiltrados.length }} de {{ productos.length }} productos</p>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table" *ngIf="productosFiltrados.length > 0">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Producto</th>
+            <th>Categoría</th>
+            <th>Precio</th>
+            <th>P. Mayoreo</th>
+            <th>Stock</th>
+            <th>Mín</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let producto of productosFiltrados">
+            <td class="td-code">{{ producto.codigoBarras }}</td>
+            <td class="td-name">{{ producto.nombre }}</td>
+            <td>{{ producto.categoria }}</td>
+            <td class="td-price">${{ producto.precio | number:'1.2-2' }}</td>
+            <td class="td-price">${{ producto.precioMayoreo | number:'1.2-2' }}</td>
+            <td class="td-stock">{{ producto.stock }}</td>
+            <td class="td-min">{{ producto.stockMinimo }}</td>
+            <td>
+              <span 
+                class="badge"
+                [style.background-color]="getEstadoStock(producto).color">
+                {{ getEstadoStock(producto).icono }}
+              </span>
+            </td>
+            <td class="td-actions">
+              <button 
+                class="btn-icon-action"
+                (click)="eliminarProducto(producto)"
+                title="Eliminar">
+                🗑️
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Empty State -->
+      <div class="empty-state" *ngIf="productosFiltrados.length === 0 && !cargando">
+        <div class="empty-icon">📭</div>
+        <h3>No hay productos</h3>
+        <p>{{ terminoBusqueda ? 'No se encontraron resultados' : 'Escanea un código para empezar' }}</p>
+      </div>
+    </div>
+  </div>
+</div>
