@@ -28,6 +28,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   scannerActivo = false;
   mostrarFormulario = false;
   modoEdicion = false;
+  modoEdicionCompleta = false; // Nueva bandera para edición completa
   cargando = false;
 
   // Datos
@@ -88,7 +89,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Cargar productos desde Firestore
+   * Cargar productos desde Realtime Database
    */
   private cargarProductos(): void {
     this.cargando = true;
@@ -126,40 +127,69 @@ export class InventarioComponent implements OnInit, OnDestroy {
     
     // CERRAR SCANNER INMEDIATAMENTE
     this.scannerActivo = false;
+    
+    // MOSTRAR FORMULARIO CON CÓDIGO INMEDIATAMENTE
+    this.formularioProducto.patchValue({ codigoBarras: codigo });
+    this.mostrarFormulario = true;
+    
+    // Buscar en Realtime Database en segundo plano
     this.cargando = true;
     
     this.inventarioService.buscarPorCodigoBarras(codigo)
       .subscribe({
         next: (producto) => {
           if (producto) {
-            // Producto existe - Modo actualizar stock
+            // Producto existe - Actualizar formulario
             this.productoActual = producto;
             this.modoEdicion = true;
+            this.modoEdicionCompleta = false;
             this.cargarProductoEnFormulario(producto);
             this.alertasService.mostrarInfo(`✓ Producto: ${producto.nombre}`);
           } else {
-            // Producto nuevo
+            // Producto nuevo - formulario ya está listo
             this.productoActual = null;
             this.modoEdicion = false;
-            this.formularioProducto.patchValue({ codigoBarras: codigo });
+            this.modoEdicionCompleta = false;
             this.alertasService.mostrarInfo('➕ Producto nuevo');
           }
           
-          // MOSTRAR FORMULARIO
-          this.mostrarFormulario = true;
           this.cargando = false;
         },
         error: (error) => {
           console.error('Error al buscar producto:', error);
-          this.alertasService.mostrarError('❌ Error al buscar producto');
+          this.alertasService.mostrarError('❌ Error al buscar');
           this.cargando = false;
-          this.scannerActivo = false;
         }
       });
   }
 
   /**
-   * Cargar datos del producto en el formulario
+   * Abrir modal para editar producto completo
+   */
+  abrirEdicionProducto(producto: Producto): void {
+    this.productoActual = producto;
+    this.modoEdicion = false;
+    this.modoEdicionCompleta = true;
+    this.mostrarFormulario = true;
+    
+    // Cargar todos los datos habilitados para edición
+    this.formularioProducto.patchValue({
+      codigoBarras: producto.codigoBarras,
+      nombre: producto.nombre,
+      precio: producto.precio,
+      precioMayoreo: producto.precioMayoreo,
+      stock: producto.stock,
+      stockMinimo: producto.stockMinimo,
+      categoria: producto.categoria,
+      cantidadAgregar: 0
+    });
+
+    // Habilitar todos los campos para edición
+    this.formularioProducto.enable();
+  }
+
+  /**
+   * Cargar datos del producto en el formulario (solo para agregar stock)
    */
   private cargarProductoEnFormulario(producto: Producto): void {
     this.formularioProducto.patchValue({
@@ -173,7 +203,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
       cantidadAgregar: 0
     });
 
-    // Deshabilitar campos en modo edición
+    // Deshabilitar campos en modo agregar stock
     this.formularioProducto.get('codigoBarras')?.disable();
     this.formularioProducto.get('nombre')?.disable();
     this.formularioProducto.get('precio')?.disable();
@@ -184,7 +214,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Guardar producto (nuevo o actualizar stock)
+   * Guardar producto (nuevo, actualizar stock o editar completo)
    */
   guardarProducto(): void {
     if (this.formularioProducto.invalid) {
@@ -194,13 +224,47 @@ export class InventarioComponent implements OnInit, OnDestroy {
 
     this.cargando = true;
 
-    if (this.modoEdicion && this.productoActual) {
+    if (this.modoEdicionCompleta && this.productoActual) {
+      // Editar producto completo
+      this.editarProductoCompleto();
+    } else if (this.modoEdicion && this.productoActual) {
       // Actualizar stock
       this.actualizarStock();
     } else {
       // Agregar nuevo producto
       this.agregarNuevoProducto();
     }
+  }
+
+  /**
+   * Editar producto completo
+   */
+  private editarProductoCompleto(): void {
+    if (!this.productoActual) return;
+
+    const productoEditado: Partial<Producto> = {
+      codigoBarras: this.formularioProducto.get('codigoBarras')?.value,
+      nombre: this.formularioProducto.get('nombre')?.value,
+      precio: Number(this.formularioProducto.get('precio')?.value),
+      precioMayoreo: Number(this.formularioProducto.get('precioMayoreo')?.value),
+      stock: Number(this.formularioProducto.get('stock')?.value),
+      stockMinimo: Number(this.formularioProducto.get('stockMinimo')?.value),
+      categoria: this.formularioProducto.get('categoria')?.value
+    };
+
+    this.inventarioService.editarProducto(this.productoActual.id!, productoEditado)
+      .subscribe({
+        next: () => {
+          this.alertasService.mostrarExito('✅ Producto actualizado');
+          this.cerrarFormulario();
+          this.cargando = false;
+        },
+        error: (error) => {
+          console.error('Error al editar producto:', error);
+          this.alertasService.mostrarError('❌ Error al actualizar');
+          this.cargando = false;
+        }
+      });
   }
 
   /**
@@ -293,6 +357,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   cerrarFormulario(): void {
     this.mostrarFormulario = false;
     this.modoEdicion = false;
+    this.modoEdicionCompleta = false;
     this.productoActual = null;
     this.formularioProducto.reset();
     this.formularioProducto.enable();
